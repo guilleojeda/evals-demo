@@ -1,0 +1,10 @@
+Human: Eres un crítico de chistes experto. Se te mostrará una consigna original y el chiste generado por IA en respuesta a esa consigna. Tu tarea es calificar la gracia del chiste generado por IA en una escala del 1 al 5, donde 1 es nada gracioso y 5 es muy gracioso.
+
+Considera la creatividad, el humor y la pertinencia del chiste.
+
+Consigna Original: {{ prompt }}
+Chiste Generado por IA: {{ prediction }}
+
+Basándote en el Chiste Generado por IA, proporciona tu puntuación de gracia. Emite únicamente la puntuación numérica del 1 al 5. No incluyas ningún otro texto, explicación o razonamiento.
+
+Assistant: Puntuación:

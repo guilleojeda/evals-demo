@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JokeBot LLM Evaluation Demo</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto;}
+        h1 { color: #555; text-align: center;}
+        .joke-area { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background-color: #e9eff1; min-height: 50px; font-size: 1.1em; }
+        .controls { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;}
+        .controls label { margin-right: 10px; }
+        .controls select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; flex-grow: 1;}
+        .evaluations div { margin-bottom: 10px; padding: 10px; border: 1px solid #eee; border-radius: 4px; }
+        .evaluations span.label { font-weight: bold; }
+        .evaluations span.value { float: right; font-style: italic;}
+        .novelty-true { background-color: #d4edda; color: #155724; border-color: #c3e6cb;}
+        .novelty-false { background-color: #fff3cd; color: #856404; border-color: #ffeeba;}
+        .safety-true { background-color: #d4edda; color: #155724; border-color: #c3e6cb;}
+        .safety-false { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;}
+        .funniness-score { background-color: #cce5ff; color: #004085; border-color: #b8daff;}
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed;}
+        .status-message { margin-top: 15px; text-align: center; font-style: italic; color: #777;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JokeBot Evaluation</h1>
+
+        <div class="controls">
+            <label for="jokeFileSelect">Joke Collection:</label>
+            <select id="jokeFileSelect">
+                <option value="classic" selected>Classic Jokes</option>
+                <option value="tech">Tech Jokes</option>
+            </select>
+        </div>
+
+        <div class="controls">
+            <label for="funninessMethod">Funniness Method:</label>
+            <select id="funninessMethod">
+                <option value="direct_llm" selected>Direct LLM Call</option>
+                <option value="mocked">Mocked Score</option>
+                <option value="bedrock_eval_simulation">Bedrock Evaluations (Simulated)</option>
+            </select>
+        </div>
+
+        <div id="jokeDisplay" class="joke-area">
+            Click "Next Joke" to start...
+        </div>
+
+        <h2>Evaluation Results:</h2>
+        <div class="evaluations">
+            <div id="noveltyResult"><span class="label">Novelty:</span> <span class="value">N/A</span></div>
+            <div id="safetyResult"><span class="label">Safety:</span> <span class="value">N/A</span></div>
+            <div id="funninessResult"><span class="label">Funniness:</span> <span class="value">N/A</span></div>
+        </div>
+
+        <button id="nextJokeButton">Next Joke</button>
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <script>
+        const jokeDisplay = document.getElementById('jokeDisplay');
+        const noveltyResultDiv = document.getElementById('noveltyResult');
+        const safetyResultDiv = document.getElementById('safetyResult');
+        const funninessResultDiv = document.getElementById('funninessResult');
+        const nextJokeButton = document.getElementById('nextJokeButton');
+        const statusMessageDiv = document.getElementById('statusMessage');
+        const funninessMethodSelect = document.getElementById('funninessMethod');
+        const jokeFileSelect = document.getElementById('jokeFileSelect');
+
+        function resetUIState() {
+            jokeDisplay.textContent = "Click \"Next Joke\" to start...";
+            noveltyResultDiv.className = '';
+            noveltyResultDiv.querySelector('.value').textContent = 'N/A';
+            safetyResultDiv.className = '';
+            safetyResultDiv.querySelector('.value').textContent = 'N/A';
+            funninessResultDiv.className = 'funniness-score'; // Base style
+            funninessResultDiv.querySelector('.value').textContent = 'N/A';
+            statusMessageDiv.textContent = "";
+            nextJokeButton.disabled = false;
+            nextJokeButton.style.display = 'block';
+        }
+
+
+        async function fetchAndDisplayJoke() {
+            nextJokeButton.disabled = true;
+            statusMessageDiv.textContent = "Fetching and evaluating...";
+
+            jokeDisplay.textContent = "Loading joke...";
+            noveltyResultDiv.querySelector('.value').textContent = 'Evaluating...';
+            safetyResultDiv.querySelector('.value').textContent = 'Evaluating...';
+            funninessResultDiv.querySelector('.value').textContent = 'Evaluating...';
+
+            const selectedFunninessMethod = funninessMethodSelect.value;
+
+            try {
+                const response = await fetch(`/evaluate_next_joke?funniness_method=${selectedFunninessMethod}`);
+                const data = await response.json();
+
+                if (data.status === "end_of_jokes") {
+                    jokeDisplay.textContent = "Demo finished. All jokes told!";
+                    statusMessageDiv.textContent = data.message + " Refresh page or change method to restart.";
+                    nextJokeButton.disabled = true; // Keep disabled
+                    // Optionally hide button: nextJokeButton.style.display = 'none';
+                    return;
+                }
+
+                if (data.status === "ok") {
+                    jokeDisplay.textContent = data.joke;
+
+                    // Update Novelty
+                    noveltyResultDiv.querySelector('.value').textContent = data.novelty.status;
+                    noveltyResultDiv.className = data.novelty.is_novel ? 'novelty-true' : 'novelty-false';
+
+                    // Update Safety
+                    safetyResultDiv.querySelector('.value').textContent = data.safety.status;
+                    safetyResultDiv.className = data.safety.is_safe ? 'safety-true' : 'safety-false';
+
+                    // Update Funniness
+                    funninessResultDiv.querySelector('.value').textContent = `${data.funniness.score} ${data.funniness.source}`;
+                    funninessResultDiv.className = 'funniness-score'; // Base style
+
+                    statusMessageDiv.textContent = "";
+                } else {
+                    jokeDisplay.textContent = "Error fetching joke.";
+                    statusMessageDiv.textContent = data.message || "Error from server.";
+                }
+            } catch (error) {
+                console.error('Error fetching joke:', error);
+                jokeDisplay.textContent = "Failed to load joke. Check console.";
+                statusMessageDiv.textContent = "Network or client-side error.";
+            } finally {
+                // Re-enable button only if not end of jokes
+                if (jokeDisplay.textContent !== "Demo finished. All jokes told!") {
+                   nextJokeButton.disabled = false;
+                }
+            }
+        }
+        
+        async function switchJokeFile() {
+            const selectedJokeFile = jokeFileSelect.value;
+            nextJokeButton.disabled = true;
+            statusMessageDiv.textContent = `Switching to ${selectedJokeFile} jokes...`;
+            
+            try {
+                const response = await fetch(`/switch_joke_file/${selectedJokeFile}`);
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    resetUIState();
+                    statusMessageDiv.textContent = data.message;
+                } else {
+                    statusMessageDiv.textContent = data.message || "Error switching joke file.";
+                }
+            } catch (error) {
+                console.error('Error switching joke file:', error);
+                statusMessageDiv.textContent = "Network or client-side error.";
+            } finally {
+                nextJokeButton.disabled = false;
+            }
+        }
+        
+        // Load available joke files from server
+        async function loadAvailableJokeFiles() {
+            try {
+                const response = await fetch('/available_joke_files');
+                const data = await response.json();
+                
+                // Clear existing options
+                jokeFileSelect.innerHTML = '';
+                
+                // Add new options
+                data.available_files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file.charAt(0).toUpperCase() + file.slice(1) + ' Jokes';
+                    if (file === data.active_file) {
+                        option.selected = true;
+                    }
+                    jokeFileSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading available joke files:', error);
+            }
+        }
+
+        // Resets the joke cycle when the page is first loaded or when the funniness method is changed.
+        function initializeDemo() {
+            // Call the backend's root to reset its state (current_joke_index, told_jokes_texts)
+            fetch('/').then(() => {
+                resetUIState();
+                loadAvailableJokeFiles();
+                // console.log("Demo state reset.");
+            }).catch(error => {
+                console.error("Error resetting demo state on server:", error);
+                statusMessageDiv.textContent = "Error resetting server state. Please refresh.";
+            });
+        }
+
+
+        nextJokeButton.addEventListener('click', fetchAndDisplayJoke);
+        funninessMethodSelect.addEventListener('change', initializeDemo);
+        jokeFileSelect.addEventListener('change', switchJokeFile);
+
+        // Initialize on first load
+        document.addEventListener('DOMContentLoaded', initializeDemo);
+    </script>
+</body>
+</html>
